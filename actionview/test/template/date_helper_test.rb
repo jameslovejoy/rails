@@ -181,6 +181,10 @@ class DateHelperTest < ActionView::TestCase
     end_date = Date.new 2010, 11, 30
     assert_equal("almost 28 years", distance_of_time_in_words(start_date, end_date))
     assert_equal("almost 28 years", distance_of_time_in_words(end_date, start_date))
+
+    start_date = Date.new 1000, 1, 1
+    end_date = Date.new 2018, 1, 1
+    assert_equal("over 1000 years", distance_of_time_in_words(start_date, end_date))
   end
 
   def test_distance_in_words_with_integers
@@ -190,6 +194,7 @@ class DateHelperTest < ActionView::TestCase
     assert_equal "about 1 hour", distance_of_time_in_words(60 * 60, 0)
     assert_equal "about 3 years", distance_of_time_in_words(10**8)
     assert_equal "about 3 years", distance_of_time_in_words(0, 10**8)
+    assert_equal "over 1000 years", distance_of_time_in_words(0, 100_000_000_000)
   end
 
   def test_distance_in_words_with_times
@@ -207,6 +212,12 @@ class DateHelperTest < ActionView::TestCase
     assert_equal "less than a minute", distance_of_time_in_words(40.seconds, 0, include_seconds: true)
     assert_equal "less than a minute", distance_of_time_in_words(59.seconds, 0, include_seconds: true)
     assert_equal "1 minute", distance_of_time_in_words(60.seconds, 0, include_seconds: true)
+  end
+
+  def test_distance_can_go_over_limit_with_max_years_allowed
+    start_date = Date.new 1000, 1, 1
+    end_date = Date.new 2018, 1, 1
+    assert_equal("about 1018 years", distance_of_time_in_words(start_date, end_date, max_years_allowed: 2000))
   end
 
   def test_time_ago_in_words

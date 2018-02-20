@@ -43,7 +43,8 @@ module ActionView
       #   1 yr <-> 1 yr, 3 months                                                   # => about 1 year
       #   1 yr, 3 months <-> 1 yr, 9 months                                         # => over 1 year
       #   1 yr, 9 months <-> 2 yr minus 1 sec                                       # => almost 2 years
-      #   2 yrs <-> max time or date                                                # => (same rules as 1 yr)
+      #   2 yrs <-> 1000 yrs                                                        # => (same rules as 1 yr)
+      #   1000 yrs <-> max time or date                                             # => over 1000 years
       #
       # With <tt>include_seconds: true</tt> and the difference < 1 minute 29 seconds:
       #   0-4   secs      # => less than 5 seconds
@@ -94,7 +95,8 @@ module ActionView
       #   distance_of_time_in_words(from_time, from_time + 3.hours, scope: 'datetime.distance_in_words.short')    # => "3 hours"
       def distance_of_time_in_words(from_time, to_time = 0, options = {})
         options = {
-          scope: :'datetime.distance_in_words'
+          scope: :'datetime.distance_in_words',
+          max_years_allowed: 1000
         }.merge!(options)
 
         from_time = normalize_distance_of_time_argument_to_time(from_time)
@@ -131,21 +133,23 @@ module ActionView
           when 43200...86400    then locale.t :about_x_months, count: (distance_in_minutes.to_f / 43200.0).round
             # 60 days up to 365 days
           when 86400...525600   then locale.t :x_months,       count: (distance_in_minutes.to_f / 43200.0).round
-          else
+            # Up to max_years_allowed years
+          when 525600...(525600 * (options[:max_years_allowed] + 1))
+            # Discount leap days when calculating multi-year distance.
+            # e.g. if there are 20 leap days between two dates having the same day and month,
+            # then the simple 365-day calculation will come out to "over 80 years", when
+            # in written English it would read better as "about 80 years".
             from_year = from_time.year
             from_year += 1 if from_time.month >= 3
             to_year = to_time.year
             to_year -= 1 if to_time.month < 3
-            leap_years = (from_year > to_year) ? 0 : (from_year..to_year).count { |x| Date.leap?(x) }
+            leap_years = (from_year > to_year) ? 0 : (from_year..to_year).count { |year| Date.leap?(year) }
             minute_offset_for_leap_year = leap_years * 1440
-            # Discount the leap year days when calculating year distance.
-            # e.g. if there are 20 leap year days between 2 dates having the same day
-            # and month then the based on 365 days calculation
-            # the distance in years will come out to over 80 years when in written
-            # English it would read better as about 80 years.
+
             minutes_with_offset = distance_in_minutes - minute_offset_for_leap_year
-            remainder                   = (minutes_with_offset % MINUTES_IN_YEAR)
-            distance_in_years           = (minutes_with_offset.div MINUTES_IN_YEAR)
+            remainder           = (minutes_with_offset % MINUTES_IN_YEAR)
+            distance_in_years   = (minutes_with_offset.div MINUTES_IN_YEAR)
+
             if remainder < MINUTES_IN_QUARTER_YEAR
               locale.t(:about_x_years,  count: distance_in_years)
             elsif remainder < MINUTES_IN_THREE_QUARTERS_YEAR
@@ -153,6 +157,8 @@ module ActionView
             else
               locale.t(:almost_x_years, count: distance_in_years + 1)
             end
+          else
+            locale.t(:over_x_years, count: options[:max_years_allowed])
           end
         end
       end
